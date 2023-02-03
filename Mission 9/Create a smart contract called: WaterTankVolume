@@ -1,0 +1,65 @@
+pragma solidity ^0.8.0;
+
+contract WaterTankVolume {
+    // Mapping with a struct for each user
+    mapping (address => userWaterTankData) userData;
+
+    // Struct to store user data
+    struct userWaterTankData {
+        uint currentBlockTime;
+        uint8[9] currentTankWalls;
+        uint totalTanks;
+        uint currentWaterVolume;
+        uint8 maxWallPair;
+        uint totalWaterVolume;
+    }
+
+    // Function to create a new user data map
+    function createNewMap() public {
+        // Update currentBlockTime with block timestamp
+        userData[msg.sender].currentBlockTime = block.timestamp;
+
+        // Update currentTankWalls with time to wall array logic
+        uint time = userData[msg.sender].currentBlockTime;
+        time = time / 10;
+        uint8[] memory wallArray = new uint8[](9);
+        uint i;
+        for (i = 0; i < 9; i++) {
+            wallArray[i] = time % 10;
+            time = time / 10;
+        }
+        for (i = 0; i < 9; i++) {
+            if (wallArray[i] == 0) {
+                wallArray[i] = 1;
+            } else if (wallArray[i] == 9) {
+                wallArray[i] = 8;
+            }
+        }
+        userData[msg.sender].currentTankWalls = wallArray;
+
+        // Increase totalTanks by 1
+        userData[msg.sender].totalTanks += 1;
+    }
+
+    // Function to calculate the maximum current volume
+    function currentTankMaxWaterVolume() public {
+        uint8[] memory walls = userData[msg.sender].currentTankWalls;
+        uint l = 0, r = 9;
+        uint maxVolume = 0, currentVolume = 0;
+        while (l < r) {
+            if (walls[l] < walls[r]) {
+                currentVolume = (r - l) * walls[l];
+                l++;
+            } else {
+                currentVolume = (r - l) * walls[r];
+                r--;
+            }
+            if (currentVolume > maxVolume) {
+                maxVolume = currentVolume;
+                userData[msg.sender].maxWallPair = l + r;
+            }
+        }
+        userData[msg.sender].currentWaterVolume = maxVolume;
+        userData[msg.sender].totalWaterVolume += maxVolume;
+    }
+}
