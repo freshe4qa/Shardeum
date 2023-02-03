@@ -1,0 +1,47 @@
+<html>
+  <head>
+    <title>Water Tank Volume</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.0.0-beta.55/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+  </head>
+  <body>
+    <div id="metamask-connect">
+      <button id="connect-button">Connect with Metamask</button>
+    </div>
+    <div id="contract-data" style="display: none;">
+      <p>Current Block Time: <span id="current-block-time"></span></p>
+      <p>Total Tanks: <span id="total-tanks"></span></p>
+      <p>Current Water Volume: <span id="current-water-volume"></span></p>
+      <p>Max Wall Pair: <span id="max-wall-pair"></span></p>
+      <p>Total Water Volume: <span id="total-water-volume"></span></p>
+      <div id="grid-container">
+        <!-- 2D grid representation of currentTankWalls -->
+      </div>
+      <button id="create-new-tank">Create New Tank</button>
+      <button id="calculate-max-volume">Calculate Max Volume</button>
+    </div>
+    <script>
+      $(document).ready(function() {
+        // Connect with Metamask button click event
+        $("#connect-button").click(function() {
+          // Connect to Metamask
+        });
+
+        // Get contract data button click event
+        $("#get-contract-data").click(function() {
+          // Call the contract methods to get data
+        });
+
+        // Create new tank button click event
+        $("#create-new-tank").click(function() {
+          // Call the createNewMap method of the contract
+        });
+
+        // Calculate max volume button click event
+        $("#calculate-max-volume").click(function() {
+          // Call the currentTankMaxWaterVolume method of the contract
+        });
+      });
+    </script>
+  </body>
+</html>
