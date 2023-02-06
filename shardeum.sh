@@ -273,6 +273,7 @@ EOF
 cd $HOME
 cd .shardeum
 ./shell.sh
+operator-cli gui start
 
 break
 ;;
