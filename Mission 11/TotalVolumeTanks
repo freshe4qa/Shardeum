@@ -62,3 +62,44 @@
         const networkId = await web3.eth.net.getId();
 
         totalVolumeTanks = new web3
+.eth.Contract(
+TotalVolumeTanksABI,
+TotalVolumeTanksAddress,
+{ from: accounts[0] }
+);
+
+statusDisplay.innerHTML = `Connected to Metamask as ${accounts[0]}`;
+
+    updateData();
+    setInterval(updateData, 2000);
+  }
+
+  async function updateData() {
+    currentBlockTimeDisplay.innerHTML = await totalVolumeTanks.methods.currentBlockTime().call();
+    currentTankWallsDisplay.innerHTML = await totalVolumeTanks.methods.currentTankWalls().call();
+    totalTanksDisplay.innerHTML = await totalVolumeTanks.methods.totalTanks().call();
+    currentWaterVolumeDisplay.innerHTML = await totalVolumeTanks.methods.currentWaterVolume().call();
+    totalWaterVolumeDisplay.innerHTML = await totalVolumeTanks.methods.totalWaterVolume().call();
+
+    gridDisplay.innerHTML = "";
+    for (let i = 0; i < currentTankWallsDisplay.innerHTML.length; i++) {
+      gridDisplay.innerHTML += `<tr><td>${currentTankWallsDisplay.innerHTML[i].length}</td><td>${currentTankWallsDisplay.innerHTML[i].height}</td></tr>`;
+    }
+  }
+
+  createNewMapButton.addEventListener("click", async function() {
+    await totalVolumeTanks.methods.createNewMap().send({ from: accounts[0] });
+    updateData();
+  });
+
+  currentTankTotalWaterVolumeButton.addEventListener("click", async function() {
+    const totalVolume = await totalVolumeTanks.methods.calculateTotalVolume().send({ from: accounts[0] });
+    alert(`The total volume is: ${totalVolume}`);
+  });
+
+  connectButton.addEventListener("click", function() {
+    window.ethereum.enable().then(connect);
+  });
+</script>
+  </body>
+</html>
