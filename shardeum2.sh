@@ -110,11 +110,14 @@ docker-compose-safe() {
 get_ip() {
   local ip
   if command -v ip >/dev/null; then
-    ip=$(ip addr show $(ip route | awk '/default/ {print $5}') | awk '/inet/ {print $2}' | cut -d/ -f1)
-  elif command -v ifconfig >/dev/null; then
-    ip=$(ifconfig | awk '/inet addr/{print substr($2,6)}')
+    ip=$(ip addr show $(ip route | awk '/default/ {print $5}') | awk '/inet/ {print $2}' | cut -d/ -f1 | head -n1)
+  elif command -v netstat >/dev/null; then
+    # Get the default route interface
+    interface=$(netstat -rn | awk '/default/{print $4}' | head -n1)
+    # Get the IP address for the default interface
+    ip=$(ifconfig "$interface" | awk '/inet /{print $2}')
   else
-    echo "Error: neither 'ip' nor 'ifconfig' command found"
+    echo "Error: neither 'ip' nor 'ifconfig' command found. Submit a bug for your OS."
     return 1
   fi
   echo $ip
@@ -131,6 +134,9 @@ get_external_ip() {
   fi
   if [[ -z "$external_ip" ]]; then
     external_ip=$(curl -s https://icanhazip.com/)
+  fi
+    if [[ -z "$external_ip" ]]; then
+    external_ip=$(curl --header  "Host: icanhazip.com" -s 104.18.114.97)
   fi
   if [[ -z "$external_ip" ]]; then
     external_ip=$(get_ip)
@@ -161,16 +167,39 @@ EOF
 read -p "Do you want to run the web based Dashboard? (y/n): " RUNDASHBOARD
 RUNDASHBOARD=${RUNDASHBOARD:-y}
 
-while true; do
-  read -p "Set the password to access the Dashboard: " -s input
-  echo
-  if [[ -n "$input" ]] && [[ ! "$input" =~ \  ]]; then
-    DASHPASS=$input
-    break
+unset CHARCOUNT
+echo -n "Set the password to access the Dashboard: "
+CHARCOUNT=0
+while IFS= read -p "$PROMPT" -r -s -n 1 CHAR
+do
+  # Enter - accept password
+  if [[ $CHAR == $'\0' ]] ; then
+    if [ $CHARCOUNT -gt 0 ] ; then # Make sure password character length is greater than 0.
+      break
+    else
+      echo
+      echo -n "Invalid password input. Enter a password with character length greater than 0:"
+      continue
+    fi
+  fi
+  # Backspace
+  if [[ $CHAR == $'\177' ]] ; then
+    if [ $CHARCOUNT -gt 0 ] ; then
+      CHARCOUNT=$((CHARCOUNT-1))
+      PROMPT=$'\b \b'
+      DASHPASS="${DASHPASS%?}"
+    else
+      PROMPT=''
+    fi
   else
-    echo "Invalid input, try again."
+    CHARCOUNT=$((CHARCOUNT+1))
+    PROMPT='*'
+    DASHPASS+="$CHAR"
   fi
 done
+
+echo # New line after inputs.
+# echo "Password saved as:" $DASHPASS #DEBUG: TEST PASSWORD WAS RECORDED AFTER ENTERED.
 
 while :; do
   read -p "Enter the port (1025-65536) to access the web based Dashboard (default 8080): " DASHPORT
@@ -186,7 +215,7 @@ done
 
 while :; do
   echo "To run a validator on the Sphinx network, you will need to open two ports in your firewall."
-  read -p "This allows p2p commnication between nodes. Enter the first port (1025-65536) for p2p comminucation (default 9001): " SHMEXT
+  read -p "This allows p2p communication between nodes. Enter the first port (1025-65536) for p2p communication (default 9001): " SHMEXT
   SHMEXT=${SHMEXT:-9001}
   [[ $SHMEXT =~ ^[0-9]+$ ]] || { echo "Enter a valid port"; continue; }
   if ((SHMEXT >= 1025 && SHMEXT <= 65536)); then
@@ -194,7 +223,7 @@ while :; do
   else
     echo "Port out of range, try again"
   fi
-  read -p "Enter the second port (1025-65536) for p2p comminucation (default 10001): " SHMINT
+  read -p "Enter the second port (1025-65536) for p2p communication (default 10001): " SHMINT
   SHMINT=${SHMINT:-10001}
   [[ $SHMINT =~ ^[0-9]+$ ]] || { echo "Enter a valid port"; continue; }
   if ((SHMINT >= 1025 && SHMINT <= 65536)); then
@@ -208,20 +237,6 @@ done
 read -p "What base directory should the node use (defaults to ~/.shardeum): " NODEHOME
 NODEHOME=${NODEHOME:-~/.shardeum}
 
-# PS3='Select a network to connect to: '
-# options=("betanet")
-# select opt in "${options[@]}"
-# do
-#     case $opt in
-#         "betanet")
-#             APPSEEDLIST="18.192.49.22"
-#             APPMONITOR="3.76.28.10"
-#             break
-#             ;;
-#         *) echo "invalid option $REPLY";;
-#     esac
-# done
-
 APPSEEDLIST="archiver-sphinx.shardeum.org"
 APPMONITOR="monitor-sphinx.shardeum.org"
 
@@ -234,8 +249,12 @@ cat <<EOF
 EOF
 
 if [ -d "$NODEHOME" ]; then
-  echo "Removing existing directory $NODEHOME..."
-  rm -rf "$NODEHOME"
+  if [ "$NODEHOME" != "$(pwd)" ]; then
+    echo "Removing existing directory $NODEHOME..."
+    rm -rf "$NODEHOME"
+  else
+    echo "Cannot delete current working directory. Please move to another directory and try again."
+  fi
 fi
 
 git clone https://gitlab.com/shardeum/validator/dashboard.git ${NODEHOME} &&
@@ -251,7 +270,7 @@ cat <<EOF
 EOF
 
 SERVERIP=$(get_external_ip)
-
+LOCALLANIP=$(get_ip)
 cd ${NODEHOME} &&
 touch ./.env
 cat >./.env <<EOL
@@ -261,6 +280,7 @@ APP_MONITOR=${APPMONITOR}
 DASHPASS=${DASHPASS}
 DASHPORT=${DASHPORT}
 SERVERIP=${SERVERIP}
+LOCALLANIP=${LOCALLANIP}
 SHMEXT=${SHMEXT}
 SHMINT=${SHMINT}
 EOL
@@ -284,7 +304,7 @@ cat <<EOF
 EOF
 
 cd ${NODEHOME} &&
-docker-safe build --no-cache -t test-dashboard -f Dockerfile --build-arg RUNDASHBOARD=${RUNDASHBOARD} .
+docker-safe build --no-cache -t local-dashboard -f Dockerfile --build-arg RUNDASHBOARD=${RUNDASHBOARD} .
 
 cat <<EOF
 
@@ -296,11 +316,11 @@ EOF
 
 cd ${NODEHOME}
 if [[ "$(uname)" == "Darwin" ]]; then
-  sed -i '' "s/- '8080:8080'/- '$DASHPORT:$DASHPORT'/" docker-compose.yml
+  sed "s/- '8080:8080'/- '$DASHPORT:$DASHPORT'/" docker-compose.tmpl > docker-compose.yml
   sed -i '' "s/- '9001-9010:9001-9010'/- '$SHMEXT:$SHMEXT'/" docker-compose.yml
   sed -i '' "s/- '10001-10010:10001-10010'/- '$SHMINT:$SHMINT'/" docker-compose.yml
 else
-  sed -i "s/- '8080:8080'/- '$DASHPORT:$DASHPORT'/" docker-compose.yml
+  sed "s/- '8080:8080'/- '$DASHPORT:$DASHPORT'/" docker-compose.tmpl > docker-compose.yml
   sed -i "s/- '9001-9010:9001-9010'/- '$SHMEXT:$SHMEXT'/" docker-compose.yml
   sed -i "s/- '10001-10010:10001-10010'/- '$SHMINT:$SHMINT'/" docker-compose.yml
 fi
